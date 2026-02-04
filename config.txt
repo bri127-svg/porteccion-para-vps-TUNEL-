@@ -1,0 +1,63 @@
+PASO 3: FIREWALL (CLAVE DEL ÉXITO)
+👉 EN EL SERVIDOR REAL
+
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -i wg0 -j ACCEPT
+
+
+iptables-save > /etc/iptables/rules.v4
+
+📌 Resultado:
+
+❌ Nadie desde internet entra
+
+✅ Solo el túnel habla con él
+
+PASO 4: VERIFICACIÓN
+
+En cualquiera:
+
+wg show
+
+Prueba ping:
+
+ping 10.50.0.2   # desde VPS
+ping 10.50.0.1   # desde backend
+
+Si responde → estás blindado 🛡️
+
+🎯 Qué lograste con esto
+
+✅ IP real oculta
+✅ Ataques directos inútiles
+✅ Scans bloqueados
+✅ Base sólida para CS 1.6, Wings, Panel
+
+👉 Próximo paso (elige)
+
+1️⃣ Reenviar UDP 27015 (CS 1.6) por el túnel
+2️⃣ Proteger Pterodactyl Wings
+3️⃣ Añadir rate-limit anti flood en el VPS
+4️⃣ Convertir esto en script modular (menú)
+
+Dime el número y seguimos fino 😎
+
+
+
+
+Guárdalo como:
+
+wg-tunnel-manager.sh
+
+Dale permisos:
+
+chmod +x wg-tunnel-manager.sh
+
+Ejecuta:
+
+./wg-tunnel-manager.sh
