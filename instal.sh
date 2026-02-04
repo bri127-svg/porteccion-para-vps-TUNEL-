@@ -1,46 +1,48 @@
 #!/usr/bin/env bash
 set -e
 
-# ==============================
-# VARIABLES GLOBALES
-# ==============================
+# =====================================
+# CONFIGURACIÓN GENERAL
+# =====================================
 WG_IF="wg0"
 WG_PORT=51820
 WG_NET="10.50.0.0/24"
 WG_SERVER_IP="10.50.0.1/24"
 WG_CLIENT_IP="10.50.0.2/24"
 
-# ==============================
+# =====================================
 # VALIDAR ROOT
-# ==============================
+# =====================================
 if [ "$EUID" -ne 0 ]; then
-  echo "[ERROR] Ejecuta como root"
+  echo "[ERROR] Ejecuta este script como root"
   exit 1
 fi
 
-# ==============================
+# =====================================
 # LOGS
-# ==============================
+# =====================================
 log_info() { echo -e "\e[34m[INFO]\e[0m $1"; }
 log_ok()   { echo -e "\e[32m[OK]\e[0m $1"; }
 log_err()  { echo -e "\e[31m[ERROR]\e[0m $1"; }
 
-# ==============================
+pause() { read -p "Presiona ENTER para continuar..."; }
+
+# =====================================
 # DEPENDENCIAS
-# ==============================
-install_deps() {
+# =====================================
+deps() {
+  log_info "Instalando dependencias"
   apt update -y
   apt install -y wireguard iptables-persistent
 }
 
-# ==============================
-# INSTALAR WG SERVER
-# ==============================
-install_wg_server() {
+# =====================================
+# WIREGUARD SERVER
+# =====================================
+wg_server() {
   clear
-  log_info "Instalando WireGuard SERVER"
-
-  install_deps
+  log_info "Configurando WireGuard SERVER"
+  deps
 
   umask 077
   wg genkey | tee /etc/wireguard/server.key | wg pubkey > /etc/wireguard/server.pub
@@ -57,28 +59,29 @@ PostDown = iptables -D FORWARD -i ${WG_IF} -j ACCEPT; iptables -D FORWARD -o ${W
 EOF
 
   sysctl -w net.ipv4.ip_forward=1
-  grep -q ip_forward /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+  grep -q net.ipv4.ip_forward /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 
   systemctl enable wg-quick@${WG_IF}
   systemctl restart wg-quick@${WG_IF}
 
-  log_ok "SERVER listo"
-  echo "Clave pública del SERVER:"
+  log_ok "WireGuard SERVER listo"
+  echo ""
+  echo "CLAVE PÚBLICA DEL SERVER:"
   cat /etc/wireguard/server.pub
-  read -p "Enter para continuar..."
+  pause
 }
 
-# ==============================
-# INSTALAR WG CLIENT
-# ==============================
-install_wg_client() {
+# =====================================
+# WIREGUARD CLIENT
+# =====================================
+wg_client() {
   clear
-  log_info "Instalando WireGuard CLIENT"
+  log_info "Configurando WireGuard CLIENT"
 
   read -p "IP pública del SERVER: " SERVER_IP
   read -p "Clave pública del SERVER: " SERVER_PUB
 
-  install_deps
+  deps
 
   umask 077
   wg genkey | tee /etc/wireguard/client.key | wg pubkey > /etc/wireguard/client.pub
@@ -99,18 +102,19 @@ EOF
   systemctl enable wg-quick@${WG_IF}
   systemctl restart wg-quick@${WG_IF}
 
-  log_ok "CLIENT listo"
-  echo "Clave pública del CLIENT:"
+  log_ok "WireGuard CLIENT listo"
+  echo ""
+  echo "CLAVE PÚBLICA DEL CLIENT:"
   cat /etc/wireguard/client.pub
-  read -p "Enter para continuar..."
+  pause
 }
 
-# ==============================
-# FIREWALL BACKEND
-# ==============================
-apply_firewall_backend() {
+# =====================================
+# FIREWALL BACKEND (ANTI ATAQUES)
+# =====================================
+firewall_backend() {
   clear
-  log_info "Aplicando firewall seguro (backend)"
+  log_info "Aplicando firewall estricto (backend)"
 
   iptables -P INPUT DROP
   iptables -P FORWARD DROP
@@ -121,42 +125,42 @@ apply_firewall_backend() {
 
   iptables-save > /etc/iptables/rules.v4
 
-  log_ok "Firewall aplicado"
-  read -p "Enter para continuar..."
+  log_ok "Firewall aplicado correctamente"
+  pause
 }
 
-# ==============================
-# VER ESTADO
-# ==============================
-check_status() {
+# =====================================
+# ESTADO
+# =====================================
+status_wg() {
   clear
-  wg show || log_err "WireGuard no activo"
-  read -p "Enter para continuar..."
+  wg show || log_err "WireGuard no está activo"
+  pause
 }
 
-# ==============================
-# MENÚ
-# ==============================
+# =====================================
+# MENÚ PRINCIPAL
+# =====================================
 while true; do
   clear
-  echo "======================================="
-  echo "   GESTIÓN TÚNEL WIREGUARD (SERVER↔SERVER)"
-  echo "======================================="
+  echo "=========================================="
+  echo "  PROTECCIÓN VPS - TÚNEL WIREGUARD"
+  echo "=========================================="
   echo ""
-  echo " [1] Instalar WireGuard SERVER"
-  echo " [2] Instalar WireGuard CLIENT"
-  echo " [3] Aplicar Firewall (Backend)"
+  echo " [1] Instalar WireGuard SERVER (VPS público)"
+  echo " [2] Instalar WireGuard CLIENT (Servidor real)"
+  echo " [3] Aplicar Firewall (Servidor real)"
   echo " [4] Ver estado WireGuard"
   echo ""
   echo " [0] Salir"
   echo ""
-  read -p "Opción: " opt
+  read -p "Selecciona una opción: " opt
 
   case "$opt" in
-    1) install_wg_server ;;
-    2) install_wg_client ;;
-    3) apply_firewall_backend ;;
-    4) check_status ;;
+    1) wg_server ;;
+    2) wg_client ;;
+    3) firewall_backend ;;
+    4) status_wg ;;
     0) exit 0 ;;
     *) log_err "Opción inválida"; sleep 1 ;;
   esac
